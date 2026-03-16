@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import Image from "next/image" // 1. Added Next.js Image import
 import { useAuth } from "@/lib/auth-context"
 import { useData } from "@/lib/data-store"
 import { DashboardLayout } from "@/components/dashboard-layout"
@@ -50,6 +51,18 @@ export default function ProductsPage() {
     }
   }, [user, isLoading, router])
 
+  // 2. Helper to get the correct filename from the product name
+  const getProductImage = (name: string) => {
+    const lowerName = name.toLowerCase();
+    if (lowerName.includes("cotton")) return "/cotton.jpg";
+    if (lowerName.includes("silk")) return "/silk.jpg";
+    if (lowerName.includes("denim")) return "/Denim.jpg"; // Match your capitalized file
+    if (lowerName.includes("linen")) return "/Linen.jpg"; // Match your capitalized file
+    if (lowerName.includes("polyester")) return "/Polyester.jpg"; // Match your capitalized file
+    if (lowerName.includes("wool")) return "/Wool.jpg"; // Match your capitalized file
+    return "/placeholder.jpg";
+  }
+
   if (isLoading || !user) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -70,10 +83,18 @@ export default function ProductsPage() {
 
   const addToCart = (product: typeof products[0]) => {
     const existing = cart.find((item) => item.productId === product.id)
+    const currentQuantity = existing?.quantity || 0
+    const requestedQuantity = 100
+
+    if (currentQuantity + requestedQuantity > product.stock) {
+      // Potentially show a toast here if available, but for now just prevent adding
+      return
+    }
+
     if (existing) {
       setCart(
         cart.map((item) =>
-          item.productId === product.id ? { ...item, quantity: item.quantity + 100 } : item
+          item.productId === product.id ? { ...item, quantity: item.quantity + requestedQuantity } : item
         )
       )
     } else {
@@ -82,7 +103,7 @@ export default function ProductsPage() {
         {
           productId: product.id,
           productName: product.name,
-          quantity: 100,
+          quantity: requestedQuantity,
           price: product.price,
         },
       ])
@@ -90,6 +111,16 @@ export default function ProductsPage() {
   }
 
   const updateCartQuantity = (productId: string, delta: number) => {
+    const item = cart.find((i) => i.productId === productId)
+    if (!item) return
+
+    const product = products.find((p) => p.id === productId)
+    if (!product) return
+
+    if (delta > 0 && item.quantity + delta > product.stock) {
+      return
+    }
+
     setCart(
       cart
         .map((item) =>
@@ -126,7 +157,7 @@ export default function ProductsPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
+        {/* Header Section unchanged */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Products</h1>
@@ -138,7 +169,7 @@ export default function ProductsPage() {
           </Button>
         </div>
 
-        {/* Filters */}
+        {/* Filters Section unchanged */}
         <div className="flex flex-col gap-4 sm:flex-row">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -170,7 +201,17 @@ export default function ProductsPage() {
             const cartItem = cart.find((item) => item.productId === product.id)
             return (
               <Card key={product.id} className="border-border overflow-hidden">
-                <div className="aspect-video bg-gradient-to-br from-primary/10 via-accent/5 to-primary/5" />
+                {/* 3. REPLACED GRADIENT WITH ACTUAL IMAGE */}
+                <div className="relative aspect-video w-full bg-muted">
+                  <Image 
+                    src={getProductImage(product.name)}
+                    alt={product.name}
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                  />
+                </div>
+                
                 <CardHeader className="pb-2">
                   <div className="flex items-start justify-between">
                     <div>
@@ -231,7 +272,7 @@ export default function ProductsPage() {
           })}
         </div>
 
-        {/* Cart Dialog */}
+        {/* Cart Dialog Logic remains the same */}
         <Dialog open={isCartOpen} onOpenChange={setIsCartOpen}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>

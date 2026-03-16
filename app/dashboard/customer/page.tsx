@@ -1,25 +1,67 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import Link from "next/link"
 import { useAuth } from "@/lib/auth-context"
 import { useData } from "@/lib/data-store"
+import Image from "next/image"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Package, ShoppingCart, TrendingUp, ArrowRight, Clock, CheckCircle2 } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Badge } from "@/components/ui/badge"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Search, ShoppingCart, Plus, Minus, CheckCircle2 } from "lucide-react"
 
-export default function CustomerDashboard() {
+interface CartItem {
+  productId: string
+  productName: string
+  quantity: number
+  price: number
+}
+
+export default function ProductsPage() {
   const router = useRouter()
   const { user, isLoading } = useAuth()
-  const { products, orders } = useData()
+  const { products, addOrder } = useData()
+  const [searchQuery, setSearchQuery] = useState("")
+  const [filterCategory, setFilterCategory] = useState("all")
+  const [cart, setCart] = useState<CartItem[]>([])
+  const [isCartOpen, setIsCartOpen] = useState(false)
+  const [orderPlaced, setOrderPlaced] = useState(false)
+  const [lastOrderedItems, setLastOrderedItems] = useState<CartItem[]>([])
 
   useEffect(() => {
     if (!isLoading && (!user || user.role !== "customer")) {
       router.push("/auth/login")
     }
   }, [user, isLoading, router])
+
+  const getProductImage = (name: string) => {
+    const lowerName = name.toLowerCase();
+    if (lowerName.includes("cotton")) return "/cotton.jpg";
+    if (lowerName.includes("silk")) return "/silk.jpg";
+    if (lowerName.includes("denim")) return "/Denim.jpg";
+    if (lowerName.includes("linen")) return "/Linen.jpg";
+    if (lowerName.includes("polyester")) return "/Polyester.jpg";
+    if (lowerName.includes("wool")) return "/Wool.jpg";
+    return "/placeholder.jpg";
+  }
 
   if (isLoading || !user) {
     return (
@@ -29,170 +71,293 @@ export default function CustomerDashboard() {
     )
   }
 
-  const myOrders = orders.filter((o) => o.customerId === user.id || o.customerName === user.name)
-  const totalSpent = myOrders.reduce((sum, o) => sum + o.total, 0)
+  const categories = [...new Set(products.map((p) => p.category))]
 
-  const stats = [
-    {
-      title: "Available Products",
-      value: products.length,
-      icon: Package,
-      description: "Browse our catalog",
-    },
-    {
-      title: "My Orders",
-      value: myOrders.length,
-      icon: ShoppingCart,
-      description: "Track your orders",
-    },
-    {
-      title: "Total Spent",
-      value: `₹${(totalSpent / 1000).toFixed(1)}K`,
-      icon: TrendingUp,
-      description: "All time",
-    },
-  ]
+  const filteredProducts = products.filter((p) => {
+    const matchesSearch =
+      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.category.toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesCategory = filterCategory === "all" || p.category === filterCategory
+    return matchesSearch && matchesCategory
+  })
+
+  const addToCart = (product: typeof products[0]) => {
+    const existing = cart.find((item) => item.productId === product.id)
+    const currentQuantity = existing?.quantity || 0
+    const requestedQuantity = 100
+
+    if (currentQuantity + requestedQuantity > product.stock) {
+      return
+    }
+
+    if (existing) {
+      setCart(
+        cart.map((item) =>
+          item.productId === product.id ? { ...item, quantity: item.quantity + requestedQuantity } : item
+        )
+      )
+    } else {
+      setCart([
+        ...cart,
+        {
+          productId: product.id,
+          productName: product.name,
+          quantity: requestedQuantity,
+          price: product.price,
+        },
+      ])
+    }
+  }
+
+  const updateCartQuantity = (productId: string, delta: number) => {
+    const item = cart.find((i) => i.productId === productId)
+    if (!item) return
+
+    const product = products.find((p) => p.id === productId)
+    if (!product) return
+
+    if (delta > 0 && item.quantity + delta > product.stock) {
+      return
+    }
+
+    setCart(
+      cart
+        .map((item) =>
+          item.productId === productId
+            ? { ...item, quantity: Math.max(0, item.quantity + delta) }
+            : item
+        )
+        .filter((item) => item.quantity > 0)
+    )
+  }
+
+  const cartTotal = cart.reduce((sum, item) => sum + item.quantity * item.price, 0)
+  const cartItemCount = cart.reduce((sum, item) => sum + 1, 0)
+
+  const handlePlaceOrder = () => {
+    if (cart.length === 0) return
+
+    addOrder({
+      customerId: user.id,
+      customerName: user.name,
+      products: cart,
+      total: cartTotal,
+      status: "pending",
+    })
+
+    setLastOrderedItems([...cart])
+    setCart([])
+    setOrderPlaced(true)
+    setTimeout(() => {
+      setOrderPlaced(false)
+      setIsCartOpen(false)
+    }, 2000)
+  }
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Welcome Section */}
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Welcome, {user.name}</h1>
-          <p className="text-muted-foreground">Explore our premium textile products</p>
+        {/* Header */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Products</h1>
+            <p className="text-muted-foreground">Browse and order premium textiles</p>
+          </div>
+          <Button className="gap-2" onClick={() => setIsCartOpen(true)}>
+            <ShoppingCart className="h-4 w-4" />
+            Cart ({cartItemCount})
+          </Button>
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid gap-4 sm:grid-cols-3">
-          {stats.map((stat) => (
-            <Card key={stat.title} className="border-border">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  {stat.title}
-                </CardTitle>
-                <stat.icon className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-foreground">{stat.value}</div>
-                <p className="text-xs text-muted-foreground">{stat.description}</p>
-              </CardContent>
-            </Card>
-          ))}
+        {/* Filters */}
+        <div className="flex flex-col gap-4 sm:flex-row">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search products..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <Select value={filterCategory} onValueChange={setFilterCategory}>
+            <SelectTrigger className="w-full sm:w-48">
+              <SelectValue placeholder="Category" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Categories</SelectItem>
+              {categories.map((cat) => (
+                <SelectItem key={cat} value={cat}>
+                  {cat}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
-        {/* Quick Actions */}
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Card className="border-border">
-            <CardHeader>
-              <CardTitle>Browse Products</CardTitle>
-              <CardDescription>Explore our premium textile collection</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Link href="/dashboard/customer/products">
-                <Button className="w-full gap-2">
-                  View Products
-                  <ArrowRight className="h-4 w-4" />
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-          <Card className="border-border">
-            <CardHeader>
-              <CardTitle>Order History</CardTitle>
-              <CardDescription>Track and manage your orders</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Link href="/dashboard/customer/orders">
-                <Button variant="outline" className="w-full gap-2">
-                  View Orders
-                  <ArrowRight className="h-4 w-4" />
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Featured Products */}
-        <Card className="border-border">
-          <CardHeader>
-            <CardTitle>Featured Products</CardTitle>
-            <CardDescription>Top quality textiles for your business</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {products.slice(0, 6).map((product) => (
-                <div
-                  key={product.id}
-                  className="rounded-lg border border-border p-4 transition-shadow hover:shadow-md"
-                >
-                  <div className="mb-3 aspect-video rounded-md bg-muted" />
-                  <h3 className="font-medium text-foreground">{product.name}</h3>
-                  <p className="text-sm text-muted-foreground">{product.category}</p>
-                  <div className="mt-2 flex items-center justify-between">
-                    <span className="font-semibold text-primary">
-                      ₹{product.price}/{product.unit}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
+        {/* Products Grid */}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {filteredProducts.map((product) => {
+            const cartItem = cart.find((item) => item.productId === product.id)
+            return (
+              <Card key={product.id} className="border-border overflow-hidden">
+                <div className="relative aspect-video w-full bg-muted">
+                  <Image 
+                    src={getProductImage(product.name)}
+                    alt={product.name}
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                  />
+                </div>
+                <CardHeader className="pb-2">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <CardTitle className="text-lg">{product.name}</CardTitle>
+                      <CardDescription>{product.category}</CardDescription>
+                    </div>
+                    <Badge variant="secondary" className="text-xs">
                       {product.stock > 0 ? "In Stock" : "Out of Stock"}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-sm text-muted-foreground">{product.description}</p>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-2xl font-bold text-primary">
+                        ₹{product.price.toLocaleString()}
+                      </span>
+                      <span className="text-sm text-muted-foreground">/{product.unit}</span>
+                    </div>
+                    <span className="text-sm text-muted-foreground">
+                      {product.stock.toLocaleString()} {product.unit} available
                     </span>
+                  </div>
+                  {cartItem ? (
+                    <div className="flex items-center justify-between rounded-lg border border-border p-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => updateCartQuantity(product.id, -100)}
+                      >
+                        <Minus className="h-4 w-4" />
+                      </Button>
+                      <span className="font-medium">
+                        {cartItem.quantity} {product.unit}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => updateCartQuantity(product.id, 100)}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      className="w-full gap-2"
+                      onClick={() => addToCart(product)}
+                      disabled={product.stock === 0}
+                    >
+                      <ShoppingCart className="h-4 w-4" />
+                      Add to Cart
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
+
+        {/* Cart Dialog */}
+        <Dialog open={isCartOpen} onOpenChange={setIsCartOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Your Cart</DialogTitle>
+              <DialogDescription>Review your order before placing</DialogDescription>
+            </DialogHeader>
+            {orderPlaced ? (
+              <div className="flex flex-col items-center justify-center py-8">
+                <CheckCircle2 className="mb-4 h-16 w-16 text-accent" />
+                <p className="text-xl font-bold text-foreground">Order Placed Successfully!</p>
+                <p className="mb-6 text-sm text-muted-foreground text-center">
+                  You can track it in your orders page. Here is what you ordered:
+                </p>
+                
+                <div className="w-full space-y-3 rounded-lg border border-border bg-muted/30 p-4 max-h-48 overflow-y-auto">
+                  {lastOrderedItems.map((item, idx) => (
+                    <div key={idx} className="flex justify-between items-center text-sm">
+                      <div className="flex flex-col">
+                        <span className="font-medium text-foreground">{item.productName}</span>
+                        <span className="text-xs text-muted-foreground">Qty: {item.quantity}</span>
+                      </div>
+                      <span className="font-semibold text-primary">₹{(item.price * item.quantity).toLocaleString()}</span>
+                    </div>
+                  ))}
+                  <div className="pt-2 mt-2 border-t border-border flex justify-between items-center font-bold">
+                    <span>Total</span>
+                    <span className="text-foreground">₹{lastOrderedItems.reduce((acc, item) => acc + (item.price * item.quantity), 0).toLocaleString()}</span>
                   </div>
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Recent Orders */}
-        {myOrders.length > 0 && (
-          <Card className="border-border">
-            <CardHeader>
-              <CardTitle>Recent Orders</CardTitle>
-              <CardDescription>Your latest order activity</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {myOrders.slice(0, 3).map((order) => (
-                  <div
-                    key={order.id}
-                    className="flex items-center justify-between rounded-lg border border-border p-4"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-                        {order.status === "delivered" ? (
-                          <CheckCircle2 className="h-5 w-5 text-accent" />
-                        ) : (
-                          <Clock className="h-5 w-5 text-primary" />
-                        )}
-                      </div>
+              </div>
+            ) : cart.length === 0 ? (
+              <div className="py-8 text-center">
+                <ShoppingCart className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+                <p className="text-muted-foreground">Your cart is empty</p>
+              </div>
+            ) : (
+              <>
+                <div className="max-h-64 space-y-3 overflow-y-auto">
+                  {cart.map((item) => (
+                    <div
+                      key={item.productId}
+                      className="flex items-center justify-between rounded-lg border border-border p-3"
+                    >
                       <div>
-                        <p className="font-medium text-foreground">{order.id}</p>
+                        <p className="font-medium text-foreground">{item.productName}</p>
                         <p className="text-sm text-muted-foreground">
-                          {order.products.length} items - {order.createdAt}
+                          ₹{item.price} x {item.quantity}
                         </p>
                       </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 w-8 p-0"
+                          onClick={() => updateCartQuantity(item.productId, -100)}
+                        >
+                          <Minus className="h-3 w-3" />
+                        </Button>
+                        <span className="w-12 text-center text-sm">{item.quantity}</span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 w-8 p-0"
+                          onClick={() => updateCartQuantity(item.productId, 100)}
+                        >
+                          <Plus className="h-3 w-3" />
+                        </Button>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="font-medium text-foreground">₹{order.total.toLocaleString()}</p>
-                      <span
-                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                          order.status === "pending"
-                            ? "bg-chart-5/10 text-chart-5"
-                            : order.status === "processing"
-                            ? "bg-primary/10 text-primary"
-                            : order.status === "shipped"
-                            ? "bg-chart-4/10 text-chart-4"
-                            : "bg-accent/10 text-accent"
-                        }`}
-                      >
-                        {order.status}
-                      </span>
-                    </div>
+                  ))}
+                </div>
+                <div className="border-t border-border pt-4">
+                  <div className="flex items-center justify-between text-lg font-semibold">
+                    <span>Total</span>
+                    <span className="text-primary">₹{cartTotal.toLocaleString()}</span>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsCartOpen(false)}>
+                    Continue Shopping
+                  </Button>
+                  <Button onClick={handlePlaceOrder}>Place Order</Button>
+                </DialogFooter>
+              </>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   )

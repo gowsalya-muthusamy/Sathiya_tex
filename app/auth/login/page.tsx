@@ -12,7 +12,7 @@ import { Loader2, LogIn } from "lucide-react"
 
 const demoAccounts = [
   { role: "Owner", email: "owner@sathiyatex.com", password: "owner123" },
-  { role: "Customer", email: "customer@example.com", password: "customer123" },
+  { role: "Customer", email: "hari@gmail.com", password: "customer123" },
   { role: "Employee", email: "employee@sathiyatex.com", password: "employee123" },
 ]
 
@@ -150,30 +150,6 @@ export default function LoginPage() {
                 </Button>
               </form>
 
-              {/* Demo Accounts */}
-              <div className="mt-8">
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-border" />
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-card px-2 text-muted-foreground">Demo Accounts</span>
-                  </div>
-                </div>
-                <div className="mt-4 space-y-2">
-                  {demoAccounts.map((account) => (
-                    <button
-                      key={account.role}
-                      type="button"
-                      onClick={() => handleDemoLogin(account.email, account.password)}
-                      className="w-full rounded-lg border border-border bg-muted/50 px-4 py-3 text-left transition-colors hover:bg-muted"
-                    >
-                      <div className="text-sm font-medium text-foreground">{account.role}</div>
-                      <div className="text-xs text-muted-foreground">{account.email}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
             </CardContent>
           </Card>
         </div>

@@ -234,28 +234,52 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [employees, setEmployees] = useState<Employee[]>([])
   const [orders, setOrders] = useState<Order[]>([])
 
-  // Demo accounts should see the demo dataset.
+  // Load orders from localStorage on mount
+  useEffect(() => {
+    const savedOrders = localStorage.getItem("sathiya_tex_orders")
+    if (savedOrders) {
+      try {
+        setOrders(JSON.parse(savedOrders))
+      } catch (e) {
+        console.error("Failed to parse saved orders", e)
+      }
+    }
+  }, [])
+
+  // Save orders to localStorage whenever they change
+  useEffect(() => {
+    if (orders.length > 0) {
+      localStorage.setItem("sathiya_tex_orders", JSON.stringify(orders))
+    }
+  }, [orders])
+
+  // Demo accounts should see the demo dataset plus any newly placed orders.
   // New users should start with clean state (no demo orders / employees).
   useEffect(() => {
     const demoEmails = [
       "owner@sathiyatex.com",
       "customer@example.com",
       "employee@sathiyatex.com",
+      "hari@gmail.com",
     ]
 
     if (!user) {
       setEmployees([])
-      setOrders([])
+      // Don't clear orders here, they are global for the session
       return
     }
 
     if (demoEmails.includes(user.email)) {
       setEmployees(initialEmployees)
-      setOrders(initialOrders)
+      
+      // Merge initial demo orders with current orders (if not already present)
+      setOrders((prev) => {
+        const existingIds = new Set(prev.map(o => o.id))
+        const newDemoOrders = initialOrders.filter(o => !existingIds.has(o.id))
+        return [...prev, ...newDemoOrders]
+      })
       return
     }
-
-    setOrders([])
 
     if (user.role === "employee") {
       setEmployees((prev) => {
@@ -319,12 +343,21 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }
 
   const addOrder = (order: Omit<Order, "id" | "createdAt">) => {
-    const newOrder: Order = {
-      ...order,
-      id: `ORD${String(orders.length + 1).padStart(3, "0")}`,
-      createdAt: new Date().toISOString().split("T")[0],
-    }
-    setOrders((prev) => [...prev, newOrder])
+    setOrders((prev) => {
+      const newOrder: Order = {
+        ...order,
+        id: `ORD${String(prev.length + 1).padStart(3, "0")}`,
+        createdAt: new Date().toISOString().split("T")[0],
+      }
+      return [...prev, newOrder]
+    })
+
+    // Update product stock levels
+    order.products.forEach((item) => {
+      updateProduct(item.productId, {
+        stock: products.find((p) => p.id === item.productId)!.stock - item.quantity,
+      })
+    })
   }
 
   const updateOrder = (id: string, data: Partial<Order>) => {
