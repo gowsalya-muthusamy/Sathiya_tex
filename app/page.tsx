@@ -71,11 +71,6 @@ export default function HomePage() {
                 <TrendingUp className="w-4 h-4" />
               </Button>
             </Link>
-            <Link href="/auth/login">
-              <Button size="lg" variant="outline">
-                View Demo
-              </Button>
-            </Link>
           </div>
         </div>
       </section>

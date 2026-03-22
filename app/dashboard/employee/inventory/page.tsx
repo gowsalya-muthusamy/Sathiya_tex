@@ -15,15 +15,32 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Search, Package, AlertTriangle, CheckCircle2 } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { Search, Package, AlertTriangle, CheckCircle2, Edit2 } from "lucide-react"
 
 export default function EmployeeInventoryPage() {
   const router = useRouter()
   const { user, isLoading } = useAuth()
-  const { products } = useData()
+  const { products, updateProduct } = useData()
   const [searchQuery, setSearchQuery] = useState("")
   const [filterCategory, setFilterCategory] = useState("all")
   const [filterStatus, setFilterStatus] = useState("all")
+  
+  const [editingProduct, setEditingProduct] = useState<any | null>(null)
+  const [newStock, setNewStock] = useState<string>("")
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  
+  const canUpdateStock = user?.department?.toLowerCase() === "control"
 
   useEffect(() => {
     if (!isLoading && (!user || user.role !== "employee")) {
@@ -39,7 +56,22 @@ export default function EmployeeInventoryPage() {
     )
   }
 
-  const categories = [...new Set(products.map((p) => p.category))]
+  const handleUpdateStock = () => {
+    if (editingProduct && newStock !== "") {
+      updateProduct(editingProduct.id, { stock: Number(newStock) })
+      setIsDialogOpen(false)
+      setEditingProduct(null)
+      setNewStock("")
+    }
+  }
+
+  const openEditDialog = (product: any) => {
+    setEditingProduct(product)
+    setNewStock(String(product.stock))
+    setIsDialogOpen(true)
+  }
+
+  const categories = [...new Set(products.map((p) => p.category).filter(Boolean))]
 
   const filteredProducts = products.filter((p) => {
     const matchesSearch =
@@ -60,9 +92,11 @@ export default function EmployeeInventoryPage() {
     <DashboardLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Inventory Overview</h1>
-          <p className="text-muted-foreground">View current stock levels (read-only)</p>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Inventory Management</h1>
+            <p className="text-muted-foreground">Manage and update stock levels</p>
+          </div>
         </div>
 
         {/* Stats */}
@@ -147,7 +181,7 @@ export default function EmployeeInventoryPage() {
             return (
               <Card
                 key={product.id}
-                className={`border-border ${isLowStock ? "border-destructive/30" : ""}`}
+                className={`border-border flex flex-col ${isLowStock ? "border-destructive/30" : ""}`}
               >
                 <CardHeader className="pb-2">
                   <div className="flex items-start justify-between">
@@ -158,7 +192,7 @@ export default function EmployeeInventoryPage() {
                     <Badge
                       className={
                         isLowStock
-                          ? "bg-destructive/10 text-destructive"
+                           ? "bg-destructive/10 text-destructive"
                           : "bg-accent/10 text-accent"
                       }
                     >
@@ -166,8 +200,8 @@ export default function EmployeeInventoryPage() {
                     </Badge>
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <p className="text-sm text-muted-foreground">{product.description}</p>
+                <CardContent className="space-y-4 flex-1">
+                  <p className="text-sm text-muted-foreground line-clamp-2">{product.description}</p>
                   
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
@@ -180,12 +214,6 @@ export default function EmployeeInventoryPage() {
                       <span className="text-muted-foreground">Minimum Required</span>
                       <span className="font-medium text-foreground">
                         {product.minStock.toLocaleString()} {product.unit}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Price</span>
-                      <span className="font-medium text-primary">
-                        ₹{product.price.toLocaleString()}/{product.unit}
                       </span>
                     </div>
                   </div>
@@ -212,11 +240,62 @@ export default function EmployeeInventoryPage() {
                       />
                     </div>
                   </div>
+
+                  {canUpdateStock ? (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="w-full gap-2 mt-2"
+                      onClick={() => openEditDialog(product)}
+                    >
+                      <Edit2 className="h-4 w-4" />
+                      Update Stock
+                    </Button>
+                  ) : (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="w-full gap-2 mt-2 opacity-50 cursor-not-allowed"
+                      disabled
+                    >
+                      <Edit2 className="h-4 w-4" />
+                      Update Stock (Control Only)
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             )
           })}
         </div>
+
+        {/* Update Stock Dialog */}
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Update Stock Level</DialogTitle>
+              <DialogDescription>
+                Adjust the current stock for <strong>{editingProduct?.name}</strong>.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="stock">New Stock Quantity ({editingProduct?.unit})</Label>
+                <Input
+                  id="stock"
+                  type="number"
+                  value={newStock}
+                  onChange={(e) => setNewStock(e.target.value)}
+                  placeholder="Enter quantity"
+                  autoFocus
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
+              <Button onClick={handleUpdateStock}>Save Changes</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   )

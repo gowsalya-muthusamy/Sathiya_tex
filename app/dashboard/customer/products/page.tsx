@@ -44,10 +44,17 @@ export default function ProductsPage() {
   const [cart, setCart] = useState<CartItem[]>([])
   const [isCartOpen, setIsCartOpen] = useState(false)
   const [orderPlaced, setOrderPlaced] = useState(false)
+  const [address, setAddress] = useState("")
+  const [phone, setPhone] = useState(user?.phone || "")
+  const [paymentMode, setPaymentMode] = useState<"cod" | "upi">("cod")
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
     if (!isLoading && (!user || user.role !== "customer")) {
       router.push("/auth/login")
+    }
+    if (user?.phone && !phone) {
+      setPhone(user.phone)
     }
   }, [user, isLoading, router])
 
@@ -71,7 +78,7 @@ export default function ProductsPage() {
     )
   }
 
-  const categories = [...new Set(products.map((p) => p.category))]
+  const categories = [...new Set(products.map((p) => p.category).filter(Boolean))]
 
   const filteredProducts = products.filter((p) => {
     const matchesSearch =
@@ -87,7 +94,6 @@ export default function ProductsPage() {
     const requestedQuantity = 100
 
     if (currentQuantity + requestedQuantity > product.stock) {
-      // Potentially show a toast here if available, but for now just prevent adding
       return
     }
 
@@ -135,29 +141,45 @@ export default function ProductsPage() {
   const cartTotal = cart.reduce((sum, item) => sum + item.quantity * item.price, 0)
   const cartItemCount = cart.reduce((sum, item) => sum + 1, 0)
 
-  const handlePlaceOrder = () => {
+  const handlePlaceOrder = async () => {
     if (cart.length === 0) return
+    if (!address || !phone) {
+      alert("Please provide address and phone number")
+      return
+    }
 
-    addOrder({
-      customerId: user.id,
-      customerName: user.name,
-      products: cart,
-      total: cartTotal,
-      status: "pending",
-    })
+    setIsSubmitting(true)
 
-    setCart([])
-    setOrderPlaced(true)
-    setTimeout(() => {
-      setOrderPlaced(false)
-      setIsCartOpen(false)
-    }, 2000)
+    try {
+      addOrder({
+        customerId: user.id,
+        customerName: user.name,
+        products: cart,
+        total: cartTotal,
+        status: "pending",
+        address,
+        phone,
+        paymentMode,
+      })
+
+      setCart([])
+      setOrderPlaced(true)
+      setTimeout(() => {
+        setOrderPlaced(false)
+        setIsCartOpen(false)
+        setAddress("")
+        setIsSubmitting(false)
+      }, 2000)
+    } catch (error) {
+      console.error("Order error:", error)
+      setIsSubmitting(false)
+    }
   }
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header Section unchanged */}
+        {/* Header Section */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Products</h1>
@@ -169,7 +191,7 @@ export default function ProductsPage() {
           </Button>
         </div>
 
-        {/* Filters Section unchanged */}
+        {/* Filters Section */}
         <div className="flex flex-col gap-4 sm:flex-row">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -201,7 +223,6 @@ export default function ProductsPage() {
             const cartItem = cart.find((item) => item.productId === product.id)
             return (
               <Card key={product.id} className="border-border overflow-hidden">
-                {/* 3. REPLACED GRADIENT WITH ACTUAL IMAGE */}
                 <div className="relative aspect-video w-full bg-muted">
                   <Image 
                     src={getProductImage(product.name)}
@@ -224,7 +245,7 @@ export default function ProductsPage() {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <p className="text-sm text-muted-foreground">{product.description}</p>
+                  <p className="text-sm text-muted-foreground line-clamp-2">{product.description}</p>
                   <div className="flex items-center justify-between">
                     <div>
                       <span className="text-2xl font-bold text-primary">
@@ -272,19 +293,20 @@ export default function ProductsPage() {
           })}
         </div>
 
-        {/* Cart Dialog Logic remains the same */}
+        {/* Cart Dialog */}
         <Dialog open={isCartOpen} onOpenChange={setIsCartOpen}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle>Your Cart</DialogTitle>
-              <DialogDescription>Review your order before placing</DialogDescription>
+              <DialogDescription>Review your order and provided details before placing</DialogDescription>
             </DialogHeader>
             {orderPlaced ? (
-              <div className="flex flex-col items-center justify-center py-8">
+              <div className="flex flex-col items-center justify-center py-8 text-center">
                 <CheckCircle2 className="mb-4 h-16 w-16 text-accent" />
                 <p className="text-lg font-medium text-foreground">Order Placed Successfully!</p>
-                <p className="text-sm text-muted-foreground">
-                  You can track it in your orders page
+                <p className="text-sm text-muted-foreground mt-2">
+                  Payment Mode: <span className="font-bold uppercase">{paymentMode}</span><br/>
+                  We will contact you shortly at {phone}.
                 </p>
               </div>
             ) : cart.length === 0 ? (
@@ -294,7 +316,7 @@ export default function ProductsPage() {
               </div>
             ) : (
               <>
-                <div className="max-h-64 space-y-3 overflow-y-auto">
+                <div className="max-h-64 space-y-3 overflow-y-auto pr-2">
                   {cart.map((item) => (
                     <div
                       key={item.productId}
@@ -328,17 +350,100 @@ export default function ProductsPage() {
                     </div>
                   ))}
                 </div>
-                <div className="border-t border-border pt-4">
-                  <div className="flex items-center justify-between text-lg font-semibold">
+
+                <div className="space-y-4 border-t border-border pt-4">
+                  <div className="grid gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="address">Delivery Address</Label>
+                      <Input 
+                        id="address" 
+                        placeholder="Enter your full address" 
+                        value={address}
+                        onChange={(e) => setAddress(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="phone">Phone Number</Label>
+                      <Input 
+                        id="phone" 
+                        placeholder="Enter contact number" 
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-4">
+                      <Label>Payment Mode</Label>
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <label className={`flex flex-col items-center justify-center gap-2 rounded-lg border p-4 cursor-pointer transition-all hover:shadow-md ${paymentMode === "cod" ? "bg-primary/10 border-primary text-primary ring-1 ring-primary" : "border-border hover:bg-muted"}`}>
+                          <input 
+                            type="radio" 
+                            name="paymentMode" 
+                            value="cod" 
+                            className="sr-only"
+                            checked={paymentMode === "cod"}
+                            onChange={() => setPaymentMode("cod")}
+                          />
+                          <CheckCircle2 className={`h-5 w-5 ${paymentMode === "cod" ? "text-primary" : "text-muted-foreground"}`} />
+                          <span className="text-sm font-bold text-center">Cash on Delivery</span>
+                        </label>
+
+                        <label className={`flex flex-col items-center justify-center gap-2 rounded-lg border p-4 cursor-pointer transition-all hover:shadow-md ${paymentMode === "upi" ? "bg-primary/10 border-primary text-primary ring-1 ring-primary" : "border-border hover:bg-muted"}`}>
+                          <input 
+                            type="radio" 
+                            name="paymentMode" 
+                            value="upi" 
+                            className="sr-only"
+                            checked={paymentMode === "upi"}
+                            onChange={() => setPaymentMode("upi")}
+                          />
+                          <div className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/20 text-[10px] font-bold text-primary">UPI</div>
+                          <span className="text-sm font-bold text-center">UPI / GPay</span>
+                        </label>
+                      </div>
+
+                      {paymentMode === "upi" && (
+                        <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                          <Button 
+                            className="w-full h-12 bg-[#5f6368] hover:bg-[#4a4d51] text-white flex items-center justify-center gap-2 text-lg font-bold"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              if (!address || !phone) {
+                                alert("Please provide address and phone number before payment");
+                                return;
+                              }
+                              // Simulation of UPI deep link for GPay
+                              const upiLink = `upi://pay?pa=sathiyatex@upi&pn=Sathiya%20Tex&am=${cartTotal}&cu=INR`;
+                              window.location.href = upiLink;
+                            }}
+                          >
+                            <svg className="h-6 w-14" viewBox="0 0 40 16" fill="currentColor">
+                              <path d="M12.4 2.8v10.4h-2.1V2.8h2.1zm-4.3 0c.9 0 1.6.3 2.1.8l-1.5 1.5c-.2-.2-.4-.3-.6-.3-.4 0-.7.3-.7.7s.3.7.7.7c.2 0 .4-.1.6-.3l1.5 1.5c-.5.5-1.2.8-2.1.8-1.5 0-2.8-1.2-2.8-2.8s1.3-2.9 2.8-2.9zm8.5 0h2.1v10.4h-2.1V2.8zm5.7 0c1.5 0 2.8 1.2 2.8 2.8s-1.3 2.8-2.8 2.8c-.9 0-1.6-.3-2.1-.8l1.5-1.5c.2.2.4.3.6.3.4 0 .7-.3.7-.7s-.3-.7-.7-.7c-.2 0-.4.1-.6.3l-1.5-1.5c.5-.5 1.2-.8 2.1-.8zm5.7 0h2.1l-3.5 10.4h-2.1L24 2.8h2.1l2 7.2 1.9-7.2z" />
+                            </svg>
+                            Pay ₹{cartTotal.toLocaleString()}
+                          </Button>
+                          <p className="text-[10px] text-center text-muted-foreground mt-1 italic">
+                            Secure UPI payment powered by GPay
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between text-lg font-semibold pt-2 border-t border-border">
                     <span>Total</span>
                     <span className="text-primary">₹{cartTotal.toLocaleString()}</span>
                   </div>
                 </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setIsCartOpen(false)}>
-                    Continue Shopping
+
+                <DialogFooter className="gap-2 sm:gap-0">
+                  <Button variant="outline" onClick={() => setIsCartOpen(false)} disabled={isSubmitting}>
+                    Cancel
                   </Button>
-                  <Button onClick={handlePlaceOrder}>Place Order</Button>
+                  <Button onClick={handlePlaceOrder} disabled={isSubmitting || !address || !phone}>
+                    {isSubmitting ? "Placing Order..." : "Place Order"}
+                  </Button>
                 </DialogFooter>
               </>
             )}

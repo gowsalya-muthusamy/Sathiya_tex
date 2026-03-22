@@ -27,6 +27,9 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<AuthResult>
   signup: (userData: Omit<User, "id"> & { password: string }) => Promise<AuthResult>
   logout: () => Promise<void>
+  updateProfile: (data: Partial<Omit<User, "id" | "role" | "email">>) => Promise<AuthResult>
+  resetPasswordEmail: (email: string) => Promise<AuthResult>
+  updatePassword: (password: string) => Promise<AuthResult>
   isLoading: boolean
 }
 
@@ -137,8 +140,68 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null)
   }
 
+  const updateProfile = async (
+    data: Partial<Omit<User, "id" | "role" | "email">>
+  ): Promise<AuthResult> => {
+    setIsLoading(true)
+    const { data: updateData, error } = await supabase.auth.updateUser({
+      data: { ...data },
+    })
+
+    if (error) {
+      setIsLoading(false)
+      return { success: false, error: error.message }
+    }
+
+    const mapped = mapSupabaseUser(updateData.user)
+    setUser(mapped)
+    setIsLoading(false)
+    return { success: true, user: mapped }
+  }
+
+  const resetPasswordEmail = async (email: string): Promise<AuthResult> => {
+    setIsLoading(true)
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/auth/reset-password`,
+    })
+    setIsLoading(false)
+
+    if (error) {
+      return { success: false, error: error.message }
+    }
+
+    return { success: true }
+  }
+
+  const updatePassword = async (password: string): Promise<AuthResult> => {
+    setIsLoading(true)
+    const { data: updateData, error } = await supabase.auth.updateUser({
+      password,
+    })
+    setIsLoading(false)
+
+    if (error) {
+      return { success: false, error: error.message }
+    }
+
+    const mapped = mapSupabaseUser(updateData.user)
+    setUser(mapped)
+    return { success: true, user: mapped }
+  }
+
   return (
-    <AuthContext.Provider value={{ user, login, signup, logout, isLoading }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        login,
+        signup,
+        logout,
+        updateProfile,
+        resetPasswordEmail,
+        updatePassword,
+        isLoading,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   )

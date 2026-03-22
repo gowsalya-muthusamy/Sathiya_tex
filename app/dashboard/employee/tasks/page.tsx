@@ -33,8 +33,11 @@ export default function EmployeeTasksPage() {
     (e) => e.email === user.email || e.name === user.name
   )
 
+  // Find assigned tasks (case-insensitive)
   const assignedOrders = orders.filter(
-    (o) => o.assignedEmployee === user.name || o.assignedEmployee === employeeDetails?.name
+    (o) => 
+      o.assignedEmployee?.toLowerCase() === user.name.toLowerCase() || 
+      o.assignedEmployee?.toLowerCase() === employeeDetails?.name.toLowerCase()
   )
 
   const getStatusIcon = (status: string) => {

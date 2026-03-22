@@ -8,22 +8,29 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useAuth } from "@/lib/auth-context"
-import { Loader2, LogIn } from "lucide-react"
+import { Loader2, LogIn, Mail } from "lucide-react"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 
-const demoAccounts = [
-  { role: "Owner", email: "owner@sathiyatex.com", password: "owner123" },
-  { role: "Customer", email: "hari@gmail.com", password: "customer123" },
-  { role: "Employee", email: "employee@sathiyatex.com", password: "employee123" },
-]
 
 export default function LoginPage() {
   const router = useRouter()
-  const { login, isLoading } = useAuth()
+  const { login, resetPasswordEmail, isLoading } = useAuth()
   const [formData, setFormData] = useState({
     email: "",
     password: "",
   })
   const [error, setError] = useState("")
+  const [isResetDialogOpen, setIsResetDialogOpen] = useState(false)
+  const [resetEmail, setResetEmail] = useState("")
+  const [resetStatus, setResetStatus] = useState<"idle" | "loading" | "success" | "error">("idle")
+  const [resetError, setResetError] = useState("")
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
@@ -57,29 +64,28 @@ export default function LoginPage() {
     }
   }
 
-  const handleDemoLogin = async (email: string, password: string) => {
-    setFormData({ email, password })
-    const result = await login(email, password)
-    if (!result.success) {
-      setError(result.error ?? "Invalid email or password")
-      return
-    }
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!resetEmail) return
 
-    const signedInUser = result.user
-    if (!signedInUser) return
+    setResetStatus("loading")
+    setResetError("")
 
-    switch (signedInUser.role) {
-      case "owner":
-        router.push("/dashboard/owner")
-        break
-      case "customer":
-        router.push("/dashboard/customer")
-        break
-      case "employee":
-        router.push("/dashboard/employee")
-        break
+    const result = await resetPasswordEmail(resetEmail)
+
+    if (result.success) {
+      setResetStatus("success")
+      setTimeout(() => {
+        setIsResetDialogOpen(false)
+        setResetStatus("idle")
+        setResetEmail("")
+      }, 3000)
+    } else {
+      setResetStatus("error")
+      setResetError(result.error ?? "Failed to send reset email")
     }
   }
+
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -123,7 +129,17 @@ export default function LoginPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="password">Password</Label>
+                    <Button 
+                      variant="link" 
+                      className="h-auto p-0 text-xs text-primary"
+                      type="button"
+                      onClick={() => setIsResetDialogOpen(true)}
+                    >
+                      Forgot Password?
+                    </Button>
+                  </div>
                   <Input
                     id="password"
                     name="password"
@@ -152,6 +168,67 @@ export default function LoginPage() {
 
             </CardContent>
           </Card>
+
+          {/* Forgot Password Dialog */}
+          <Dialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Reset Password</DialogTitle>
+                <DialogDescription>
+                  Enter your email address and we'll send you a link to reset your password.
+                </DialogDescription>
+              </DialogHeader>
+              {resetStatus === "success" ? (
+                <div className="flex flex-col items-center justify-center py-6 text-center">
+                  <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-accent/20 text-accent">
+                    <Mail className="h-6 w-6" />
+                  </div>
+                  <p className="text-sm font-medium text-foreground">Check your email</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    We've sent a password reset link to <span className="font-bold">{resetEmail}</span>
+                  </p>
+                </div>
+              ) : (
+                <form onSubmit={handleResetPassword} className="space-y-4 py-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="reset-email">Email Address</Label>
+                    <Input
+                      id="reset-email"
+                      type="email"
+                      placeholder="name@example.com"
+                      value={resetEmail}
+                      onChange={(e) => setResetEmail(e.target.value)}
+                      required
+                      autoFocus
+                    />
+                  </div>
+                  {resetStatus === "error" && (
+                    <p className="text-xs text-destructive">{resetError}</p>
+                  ) }
+                  <DialogFooter>
+                    <Button 
+                      variant="outline" 
+                      type="button"
+                      onClick={() => setIsResetDialogOpen(false)}
+                      disabled={resetStatus === "loading"}
+                    >
+                      Cancel
+                    </Button>
+                    <Button type="submit" disabled={resetStatus === "loading" || !resetEmail}>
+                      {resetStatus === "loading" ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Sending...
+                        </>
+                      ) : (
+                        "Send Reset Link"
+                      )}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              )}
+            </DialogContent>
+          </Dialog>
         </div>
       </main>
     </div>

@@ -33,13 +33,19 @@ export default function EmployeeDashboard() {
     (e) => e.email === user.email || e.name === user.name
   )
 
-  // Find assigned tasks
+  // Find assigned tasks (case-insensitive)
   const assignedOrders = orders.filter(
-    (o) => o.assignedEmployee === user.name || o.assignedEmployee === employeeDetails?.name
+    (o) => 
+      o.assignedEmployee?.toLowerCase() === user.name.toLowerCase() || 
+      o.assignedEmployee?.toLowerCase() === employeeDetails?.name.toLowerCase()
   )
 
   const pendingTasks = assignedOrders.filter((o) => o.status === "pending" || o.status === "processing")
   const completedTasks = assignedOrders.filter((o) => o.status === "shipped" || o.status === "delivered")
+
+  // Calculate dynamic workload: 20% per active task (pending, processing, shipped)
+  const activeTaskCount = assignedOrders.filter(o => o.status !== "delivered").length
+  const dynamicWorkload = Math.min(100, activeTaskCount * 20)
 
   const stats = [
     {
@@ -62,7 +68,7 @@ export default function EmployeeDashboard() {
     },
     {
       title: "Workload",
-      value: `${employeeDetails?.workload || 0}%`,
+      value: `${dynamicWorkload}%`,
       icon: TrendingUp,
       description: "Current capacity",
     },
@@ -123,24 +129,24 @@ export default function EmployeeDashboard() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Capacity</span>
-                  <span className="font-medium">{employeeDetails.workload}%</span>
+                  <span className="font-medium">{dynamicWorkload}%</span>
                 </div>
                 <div className="h-4 w-full overflow-hidden rounded-full bg-muted">
                   <div
                     className={`h-full rounded-full transition-all ${
-                      employeeDetails.workload > 80
+                      dynamicWorkload > 80
                         ? "bg-destructive"
-                        : employeeDetails.workload > 60
+                        : dynamicWorkload > 60
                         ? "bg-chart-5"
                         : "bg-accent"
                     }`}
-                    style={{ width: `${employeeDetails.workload}%` }}
+                    style={{ width: `${dynamicWorkload}%` }}
                   />
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  {employeeDetails.workload > 80
+                  {dynamicWorkload > 80
                     ? "High workload - Consider delegating tasks"
-                    : employeeDetails.workload > 60
+                    : dynamicWorkload > 60
                     ? "Moderate workload - Good balance"
                     : "Light workload - Available for more tasks"}
                 </p>

@@ -4,64 +4,31 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { useData } from "@/lib/data-store"
-import Image from "next/image"
+import Link from "next/link"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { Search, ShoppingCart, Plus, Minus, CheckCircle2 } from "lucide-react"
+import { 
+  ShoppingBag, 
+  Clock, 
+  CheckCircle, 
+  Package, 
+  ArrowRight,
+  TrendingUp,
+  History
+} from "lucide-react"
 
-interface CartItem {
-  productId: string
-  productName: string
-  quantity: number
-  price: number
-}
-
-export default function ProductsPage() {
+export default function CustomerDashboard() {
   const router = useRouter()
   const { user, isLoading } = useAuth()
-  const { products, addOrder } = useData()
-  const [searchQuery, setSearchQuery] = useState("")
-  const [filterCategory, setFilterCategory] = useState("all")
-  const [cart, setCart] = useState<CartItem[]>([])
-  const [isCartOpen, setIsCartOpen] = useState(false)
-  const [orderPlaced, setOrderPlaced] = useState(false)
-  const [lastOrderedItems, setLastOrderedItems] = useState<CartItem[]>([])
+  const { orders } = useData()
 
   useEffect(() => {
     if (!isLoading && (!user || user.role !== "customer")) {
       router.push("/auth/login")
     }
   }, [user, isLoading, router])
-
-  const getProductImage = (name: string) => {
-    const lowerName = name.toLowerCase();
-    if (lowerName.includes("cotton")) return "/cotton.jpg";
-    if (lowerName.includes("silk")) return "/silk.jpg";
-    if (lowerName.includes("denim")) return "/Denim.jpg";
-    if (lowerName.includes("linen")) return "/Linen.jpg";
-    if (lowerName.includes("polyester")) return "/Polyester.jpg";
-    if (lowerName.includes("wool")) return "/Wool.jpg";
-    return "/placeholder.jpg";
-  }
 
   if (isLoading || !user) {
     return (
@@ -71,293 +38,199 @@ export default function ProductsPage() {
     )
   }
 
-  const categories = [...new Set(products.map((p) => p.category))]
+  // Calculate statistics
+  const customerOrders = orders.filter(o => o.customerId === user.id)
+  const pendingOrders = customerOrders.filter(o => o.status === "pending").length
+  const recentOrders = [...customerOrders]
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 5)
 
-  const filteredProducts = products.filter((p) => {
-    const matchesSearch =
-      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.category.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesCategory = filterCategory === "all" || p.category === filterCategory
-    return matchesSearch && matchesCategory
-  })
-
-  const addToCart = (product: typeof products[0]) => {
-    const existing = cart.find((item) => item.productId === product.id)
-    const currentQuantity = existing?.quantity || 0
-    const requestedQuantity = 100
-
-    if (currentQuantity + requestedQuantity > product.stock) {
-      return
+  const stats = [
+    {
+      title: "Total Orders",
+      value: customerOrders.length,
+      icon: ShoppingBag,
+      color: "text-blue-500",
+      bg: "bg-blue-500/10"
+    },
+    {
+      title: "Active Orders",
+      value: pendingOrders,
+      icon: Clock,
+      color: "text-orange-500",
+      bg: "bg-orange-500/10"
     }
+  ]
 
-    if (existing) {
-      setCart(
-        cart.map((item) =>
-          item.productId === product.id ? { ...item, quantity: item.quantity + requestedQuantity } : item
-        )
-      )
-    } else {
-      setCart([
-        ...cart,
-        {
-          productId: product.id,
-          productName: product.name,
-          quantity: requestedQuantity,
-          price: product.price,
-        },
-      ])
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "pending": return <Badge variant="outline" className="bg-orange-500/10 text-orange-500 border-orange-500/20">Pending</Badge>
+      case "processing": return <Badge variant="outline" className="bg-blue-500/10 text-blue-500 border-blue-500/20">Processing</Badge>
+      case "shipped": return <Badge variant="outline" className="bg-purple-500/10 text-purple-500 border-purple-500/20">Shipped</Badge>
+      case "delivered": return <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/20">Delivered</Badge>
+      default: return <Badge variant="secondary">{status}</Badge>
     }
-  }
-
-  const updateCartQuantity = (productId: string, delta: number) => {
-    const item = cart.find((i) => i.productId === productId)
-    if (!item) return
-
-    const product = products.find((p) => p.id === productId)
-    if (!product) return
-
-    if (delta > 0 && item.quantity + delta > product.stock) {
-      return
-    }
-
-    setCart(
-      cart
-        .map((item) =>
-          item.productId === productId
-            ? { ...item, quantity: Math.max(0, item.quantity + delta) }
-            : item
-        )
-        .filter((item) => item.quantity > 0)
-    )
-  }
-
-  const cartTotal = cart.reduce((sum, item) => sum + item.quantity * item.price, 0)
-  const cartItemCount = cart.reduce((sum, item) => sum + 1, 0)
-
-  const handlePlaceOrder = () => {
-    if (cart.length === 0) return
-
-    addOrder({
-      customerId: user.id,
-      customerName: user.name,
-      products: cart,
-      total: cartTotal,
-      status: "pending",
-    })
-
-    setLastOrderedItems([...cart])
-    setCart([])
-    setOrderPlaced(true)
-    setTimeout(() => {
-      setOrderPlaced(false)
-      setIsCartOpen(false)
-    }, 2000)
   }
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Products</h1>
-            <p className="text-muted-foreground">Browse and order premium textiles</p>
+      <div className="space-y-8">
+        {/* Welcome Section */}
+        <div className="relative overflow-hidden rounded-2xl bg-primary px-6 py-10 text-primary-foreground sm:px-12 sm:py-16">
+          <div className="relative z-10">
+            <h1 className="text-3xl font-bold sm:text-4xl">Welcome back, {user.name}!</h1>
+            <p className="mt-2 max-w-xl text-primary-foreground/80 sm:text-lg">
+              Manage your orders, browse our premium textile collection, and track your shipments all in one place.
+            </p>
+            <div className="mt-8 flex flex-wrap gap-4">
+              <Button asChild size="lg" className="bg-white text-primary hover:bg-white/90">
+                <Link href="/dashboard/customer/products">
+                  Shop Now <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+              <Button asChild variant="outline" size="lg" className="border-white text-white hover:bg-white/10">
+                <Link href="/dashboard/customer/orders">View My Orders</Link>
+              </Button>
+            </div>
           </div>
-          <Button className="gap-2" onClick={() => setIsCartOpen(true)}>
-            <ShoppingCart className="h-4 w-4" />
-            Cart ({cartItemCount})
-          </Button>
+          <div className="absolute right-0 top-0 -mr-20 -mt-20 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
+          <div className="absolute bottom-0 left-0 -ml-20 -mb-20 h-64 w-64 rounded-full bg-accent/20 blur-3xl" />
         </div>
 
-        {/* Filters */}
-        <div className="flex flex-col gap-4 sm:flex-row">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search products..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-          <Select value={filterCategory} onValueChange={setFilterCategory}>
-            <SelectTrigger className="w-full sm:w-48">
-              <SelectValue placeholder="Category" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Categories</SelectItem>
-              {categories.map((cat) => (
-                <SelectItem key={cat} value={cat}>
-                  {cat}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Products Grid */}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filteredProducts.map((product) => {
-            const cartItem = cart.find((item) => item.productId === product.id)
-            return (
-              <Card key={product.id} className="border-border overflow-hidden">
-                <div className="relative aspect-video w-full bg-muted">
-                  <Image 
-                    src={getProductImage(product.name)}
-                    alt={product.name}
-                    fill
-                    className="object-cover"
-                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                  />
-                </div>
-                <CardHeader className="pb-2">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <CardTitle className="text-lg">{product.name}</CardTitle>
-                      <CardDescription>{product.category}</CardDescription>
-                    </div>
-                    <Badge variant="secondary" className="text-xs">
-                      {product.stock > 0 ? "In Stock" : "Out of Stock"}
-                    </Badge>
+        {/* Stats Grid */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          {stats.map((stat, i) => (
+            <Card key={i} className="border-border">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">{stat.title}</p>
+                    <h3 className="text-2xl font-bold">{stat.value}</h3>
                   </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <p className="text-sm text-muted-foreground">{product.description}</p>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-2xl font-bold text-primary">
-                        ₹{product.price.toLocaleString()}
-                      </span>
-                      <span className="text-sm text-muted-foreground">/{product.unit}</span>
-                    </div>
-                    <span className="text-sm text-muted-foreground">
-                      {product.stock.toLocaleString()} {product.unit} available
-                    </span>
-                  </div>
-                  {cartItem ? (
-                    <div className="flex items-center justify-between rounded-lg border border-border p-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => updateCartQuantity(product.id, -100)}
-                      >
-                        <Minus className="h-4 w-4" />
-                      </Button>
-                      <span className="font-medium">
-                        {cartItem.quantity} {product.unit}
-                      </span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => updateCartQuantity(product.id, 100)}
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <Button
-                      className="w-full gap-2"
-                      onClick={() => addToCart(product)}
-                      disabled={product.stock === 0}
-                    >
-                      <ShoppingCart className="h-4 w-4" />
-                      Add to Cart
-                    </Button>
-                  )}
-                </CardContent>
-              </Card>
-            )
-          })}
-        </div>
-
-        {/* Cart Dialog */}
-        <Dialog open={isCartOpen} onOpenChange={setIsCartOpen}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>Your Cart</DialogTitle>
-              <DialogDescription>Review your order before placing</DialogDescription>
-            </DialogHeader>
-            {orderPlaced ? (
-              <div className="flex flex-col items-center justify-center py-8">
-                <CheckCircle2 className="mb-4 h-16 w-16 text-accent" />
-                <p className="text-xl font-bold text-foreground">Order Placed Successfully!</p>
-                <p className="mb-6 text-sm text-muted-foreground text-center">
-                  You can track it in your orders page. Here is what you ordered:
-                </p>
-                
-                <div className="w-full space-y-3 rounded-lg border border-border bg-muted/30 p-4 max-h-48 overflow-y-auto">
-                  {lastOrderedItems.map((item, idx) => (
-                    <div key={idx} className="flex justify-between items-center text-sm">
-                      <div className="flex flex-col">
-                        <span className="font-medium text-foreground">{item.productName}</span>
-                        <span className="text-xs text-muted-foreground">Qty: {item.quantity}</span>
-                      </div>
-                      <span className="font-semibold text-primary">₹{(item.price * item.quantity).toLocaleString()}</span>
-                    </div>
-                  ))}
-                  <div className="pt-2 mt-2 border-t border-border flex justify-between items-center font-bold">
-                    <span>Total</span>
-                    <span className="text-foreground">₹{lastOrderedItems.reduce((acc, item) => acc + (item.price * item.quantity), 0).toLocaleString()}</span>
+                  <div className={`rounded-xl p-3 ${stat.bg}`}>
+                    <stat.icon className={`h-6 w-6 ${stat.color}`} />
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        <div className="grid gap-8 lg:grid-cols-2">
+          {/* Recent Orders */}
+          <Card className="border-border">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-7">
+              <div>
+                <CardTitle className="text-xl font-bold">Recent Orders</CardTitle>
+                <CardDescription>Your last few purchases</CardDescription>
               </div>
-            ) : cart.length === 0 ? (
-              <div className="py-8 text-center">
-                <ShoppingCart className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
-                <p className="text-muted-foreground">Your cart is empty</p>
-              </div>
-            ) : (
-              <>
-                <div className="max-h-64 space-y-3 overflow-y-auto">
-                  {cart.map((item) => (
-                    <div
-                      key={item.productId}
-                      className="flex items-center justify-between rounded-lg border border-border p-3"
-                    >
-                      <div>
-                        <p className="font-medium text-foreground">{item.productName}</p>
-                        <p className="text-sm text-muted-foreground">
-                          ₹{item.price} x {item.quantity}
-                        </p>
+              <History className="h-5 w-5 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              {recentOrders.length > 0 ? (
+                <div className="space-y-6">
+                  {recentOrders.map((order) => (
+                    <div key={order.id} className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+                          <Package className="h-5 w-5 text-muted-foreground" />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-foreground">{order.id}</p>
+                          <p className="text-sm text-muted-foreground">{new Date(order.createdAt).toLocaleDateString()}</p>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8 w-8 p-0"
-                          onClick={() => updateCartQuantity(item.productId, -100)}
-                        >
-                          <Minus className="h-3 w-3" />
-                        </Button>
-                        <span className="w-12 text-center text-sm">{item.quantity}</span>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8 w-8 p-0"
-                          onClick={() => updateCartQuantity(item.productId, 100)}
-                        >
-                          <Plus className="h-3 w-3" />
-                        </Button>
+                      <div className="text-right">
+                        <p className="font-bold text-primary">₹{order.total.toLocaleString()}</p>
+                        {getStatusBadge(order.status)}
                       </div>
                     </div>
                   ))}
-                </div>
-                <div className="border-t border-border pt-4">
-                  <div className="flex items-center justify-between text-lg font-semibold">
-                    <span>Total</span>
-                    <span className="text-primary">₹{cartTotal.toLocaleString()}</span>
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setIsCartOpen(false)}>
-                    Continue Shopping
+                  <Button asChild variant="ghost" className="w-full text-muted-foreground hover:text-primary">
+                    <Link href="/dashboard/customer/orders" className="flex items-center justify-center gap-2">
+                      View all orders <ArrowRight className="h-4 w-4" />
+                    </Link>
                   </Button>
-                  <Button onClick={handlePlaceOrder}>Place Order</Button>
-                </DialogFooter>
-              </>
-            )}
-          </DialogContent>
-        </Dialog>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-10 text-center">
+                  <div className="mb-4 rounded-full bg-muted p-4">
+                    <ShoppingBag className="h-8 w-8 text-muted-foreground" />
+                  </div>
+                  <p className="font-medium text-foreground">No orders yet</p>
+                  <p className="text-sm text-muted-foreground">Start shopping to see your orders here!</p>
+                  <Button asChild variant="outline" className="mt-4" size="sm">
+                    <Link href="/dashboard/customer/products">Browse Products</Link>
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Quick Links / Navigation */}
+          <div className="space-y-4">
+            <Card className="border-border bg-accent/5 overflow-hidden">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-xl font-bold">Product Categories</CardTitle>
+                <CardDescription>Explore our diverse range of fabrics</CardDescription>
+              </CardHeader>
+              <CardContent className="grid grid-cols-2 gap-3">
+                {["Cotton", "Silk", "Linen", "Denim"].map((cat) => (
+                  <Button
+                    key={cat}
+                    variant="outline"
+                    className="justify-start border-white/50 bg-white/30 backdrop-blur-sm hover:bg-white/50 h-auto py-4 px-4"
+                    asChild
+                  >
+                    <Link href={`/dashboard/customer/products?search=${cat.toLowerCase()}`}>
+                      <div className="flex flex-col items-start gap-1">
+                        <span className="font-semibold">{cat}</span>
+                        <span className="text-xs text-muted-foreground">Premium quality</span>
+                      </div>
+                    </Link>
+                  </Button>
+                ))}
+              </CardContent>
+            </Card>
+
+            <Card className="border-border bg-accent/5 overflow-hidden">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-xl font-bold">My Profile</CardTitle>
+                <CardDescription>Your account information</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Email</p>
+                  <p className="text-sm font-medium">{user.email}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Phone</p>
+                  <p className="text-sm font-medium">{user.phone || "Not provided"}</p>
+                </div>
+                <Button variant="outline" size="sm" className="w-full mt-2" asChild>
+                  <Link href="/dashboard/customer/settings">Edit Profile</Link>
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card className="border-border">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-xl font-bold flex items-center gap-2">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground font-bold">ST</span>
+                  About Sathiya Tex
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  We are committed to providing the finest quality textiles to our customers. Our collections are sourced from the best weavers and craftsmen.
+                </p>
+                <Button variant="link" className="px-0 mt-2 text-primary" asChild>
+                  <Link href="/about">Learn more about us <ArrowRight className="ml-1 h-3 w-3" /></Link>
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
     </DashboardLayout>
   )

@@ -79,10 +79,10 @@ export default function OwnerAnalyticsPage() {
 
   // Order status distribution
   const orderStatusData = [
-    { name: "Pending", value: orders.filter((o) => o.status === "pending").length, color: "hsl(var(--chart-5))" },
-    { name: "Processing", value: orders.filter((o) => o.status === "processing").length, color: "hsl(var(--primary))" },
-    { name: "Shipped", value: orders.filter((o) => o.status === "shipped").length, color: "hsl(var(--chart-4))" },
-    { name: "Delivered", value: orders.filter((o) => o.status === "delivered").length, color: "hsl(var(--accent))" },
+    { name: "Pending", value: orders.filter((o) => o.status === "pending").length, color: "#8b5cf6" }, // Violet
+    { name: "Processing", value: orders.filter((o) => o.status === "processing").length, color: "#ec4899" }, // Pink
+    { name: "Shipped", value: orders.filter((o) => o.status === "shipped").length, color: "#f59e0b" }, // Amber
+    { name: "Delivered", value: orders.filter((o) => o.status === "delivered").length, color: "#10b981" }, // Emerald
   ]
 
   // Monthly revenue trend (simulated data based on orders)
@@ -126,11 +126,12 @@ export default function OwnerAnalyticsPage() {
   }))
 
   const COLORS = [
-    "hsl(var(--primary))",
-    "hsl(var(--accent))",
-    "hsl(var(--chart-4))",
-    "hsl(var(--chart-5))",
-    "hsl(var(--chart-3))",
+    "#8b5cf6", // Violet
+    "#ec4899", // Pink
+    "#f59e0b", // Amber
+    "#06b6d4", // Cyan
+    "#10b981", // Emerald
+    "#6366f1", // Indigo
   ]
 
   return (
@@ -225,8 +226,8 @@ export default function OwnerAnalyticsPage() {
                   <AreaChart data={monthlyRevenue}>
                     <defs>
                       <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                        <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.4} />
+                        <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
@@ -247,8 +248,8 @@ export default function OwnerAnalyticsPage() {
                     <Area
                       type="monotone"
                       dataKey="revenue"
-                      stroke="hsl(var(--primary))"
-                      strokeWidth={2}
+                      stroke="#8b5cf6"
+                      strokeWidth={3}
                       fillOpacity={1}
                       fill="url(#colorRevenue)"
                     />
@@ -325,8 +326,8 @@ export default function OwnerAnalyticsPage() {
                       }}
                     />
                     <Legend />
-                    <Bar dataKey="stock" name="Current Stock" fill="hsl(var(--primary))" radius={4} />
-                    <Bar dataKey="minStock" name="Min Stock" fill="hsl(var(--chart-5))" radius={4} />
+                    <Bar dataKey="stock" name="Current Stock" fill="#8b5cf6" radius={[0, 4, 4, 0]} />
+                    <Bar dataKey="minStock" name="Min Stock" fill="#ec4899" radius={[0, 4, 4, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -358,7 +359,7 @@ export default function OwnerAnalyticsPage() {
                       dataKey="workload"
                       name="Workload %"
                       stackId="a"
-                      fill="hsl(var(--primary))"
+                      fill="#8b5cf6"
                       radius={[4, 4, 0, 0]}
                     />
                     <Bar
@@ -433,7 +434,7 @@ export default function OwnerAnalyticsPage() {
                         borderRadius: "8px",
                       }}
                     />
-                    <Bar dataKey="value" name="Employees" fill="hsl(var(--accent))" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="value" name="Employees" fill="#06b6d4" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -482,18 +483,20 @@ export default function OwnerAnalyticsPage() {
                     type="monotone"
                     dataKey="revenue"
                     name="Revenue"
-                    stroke="hsl(var(--primary))"
-                    strokeWidth={2}
-                    dot={{ fill: "hsl(var(--primary))" }}
+                    stroke="#8b5cf6"
+                    strokeWidth={3}
+                    dot={{ fill: "#8b5cf6", r: 4 }}
+                    activeDot={{ r: 6 }}
                   />
                   <Line
                     yAxisId="right"
                     type="monotone"
                     dataKey="orders"
                     name="Orders"
-                    stroke="hsl(var(--accent))"
-                    strokeWidth={2}
-                    dot={{ fill: "hsl(var(--accent))" }}
+                    stroke="#10b981"
+                    strokeWidth={3}
+                    dot={{ fill: "#10b981", r: 4 }}
+                    activeDot={{ r: 6 }}
                   />
                 </LineChart>
               </ResponsiveContainer>

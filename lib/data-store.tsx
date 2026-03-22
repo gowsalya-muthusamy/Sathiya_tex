@@ -37,6 +37,21 @@ export interface Order {
   status: "pending" | "processing" | "shipped" | "delivered"
   createdAt: string
   assignedEmployee?: string
+  address?: string
+  phone?: string
+  paymentMode?: "cod" | "upi"
+}
+
+export interface Message {
+  id: string
+  senderId: string
+  senderName: string
+  senderRole: string
+  receiverId: string
+  receiverName: string
+  content: string
+  createdAt: string
+  isRead: boolean
 }
 
 interface DataContextType {
@@ -51,6 +66,9 @@ interface DataContextType {
   deleteEmployee: (id: string) => void
   addOrder: (order: Omit<Order, "id" | "createdAt">) => void
   updateOrder: (id: string, data: Partial<Order>) => void
+  messages: Message[]
+  addMessage: (message: Omit<Message, "id" | "createdAt" | "isRead">) => void
+  markMessageRead: (messageId: string) => void
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined)
@@ -124,108 +142,9 @@ const initialProducts: Product[] = [
   },
 ]
 
-const initialEmployees: Employee[] = [
-  {
-    id: "1",
-    name: "Arun Patel",
-    email: "arun@sathiyatex.com",
-    phone: "+91 76543 21098",
-    department: "Weaving",
-    skills: ["Loom Operation", "Quality Check", "Pattern Design"],
-    status: "active",
-    workload: 75,
-    joinDate: "2020-03-15",
-    salary: 35000,
-  },
-  {
-    id: "2",
-    name: "Meera Singh",
-    email: "meera@sathiyatex.com",
-    phone: "+91 65432 10987",
-    department: "Quality Control",
-    skills: ["Fabric Testing", "Defect Analysis", "Certification"],
-    status: "active",
-    workload: 60,
-    joinDate: "2019-07-22",
-    salary: 42000,
-  },
-  {
-    id: "3",
-    name: "Vikram Reddy",
-    email: "vikram@sathiyatex.com",
-    phone: "+91 54321 09876",
-    department: "Production",
-    skills: ["Machine Maintenance", "Production Planning", "Team Lead"],
-    status: "active",
-    workload: 85,
-    joinDate: "2018-01-10",
-    salary: 55000,
-  },
-  {
-    id: "4",
-    name: "Lakshmi Devi",
-    email: "lakshmi@sathiyatex.com",
-    phone: "+91 43210 98765",
-    department: "Dyeing",
-    skills: ["Color Mixing", "Dyeing Process", "Quality Check"],
-    status: "on-leave",
-    workload: 0,
-    joinDate: "2021-05-18",
-    salary: 32000,
-  },
-  {
-    id: "5",
-    name: "Suresh Kumar",
-    email: "suresh@sathiyatex.com",
-    phone: "+91 32109 87654",
-    department: "Packaging",
-    skills: ["Packaging", "Inventory", "Shipping"],
-    status: "active",
-    workload: 45,
-    joinDate: "2022-02-28",
-    salary: 28000,
-  },
-]
+const initialEmployees: Employee[] = []
 
-const initialOrders: Order[] = [
-  {
-    id: "ORD001",
-    customerId: "2",
-    customerName: "Priya Sharma",
-    products: [
-      { productId: "1", productName: "Premium Cotton Fabric", quantity: 500, price: 450 },
-      { productId: "3", productName: "Polyester Blend", quantity: 300, price: 280 },
-    ],
-    total: 309000,
-    status: "processing",
-    createdAt: "2024-01-15",
-    assignedEmployee: "Vikram Reddy",
-  },
-  {
-    id: "ORD002",
-    customerId: "2",
-    customerName: "Textile House Ltd",
-    products: [
-      { productId: "2", productName: "Silk Saree Material", quantity: 200, price: 2500 },
-    ],
-    total: 500000,
-    status: "shipped",
-    createdAt: "2024-01-12",
-    assignedEmployee: "Arun Patel",
-  },
-  {
-    id: "ORD003",
-    customerId: "2",
-    customerName: "Fashion Exports Inc",
-    products: [
-      { productId: "5", productName: "Denim Material", quantity: 1000, price: 550 },
-      { productId: "4", productName: "Linen Fabric", quantity: 400, price: 850 },
-    ],
-    total: 890000,
-    status: "pending",
-    createdAt: "2024-01-18",
-  },
-]
+const initialOrders: Order[] = []
 
 export function DataProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
@@ -233,9 +152,20 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [products, setProducts] = useState<Product[]>(initialProducts)
   const [employees, setEmployees] = useState<Employee[]>([])
   const [orders, setOrders] = useState<Order[]>([])
+  const [messages, setMessages] = useState<Message[]>([])
+  const [isLoaded, setIsLoaded] = useState(false)
 
-  // Load orders from localStorage on mount
+  // Load orders and employees from localStorage on mount
   useEffect(() => {
+    const savedProducts = localStorage.getItem("sathiya_tex_products")
+    if (savedProducts) {
+      try {
+        setProducts(JSON.parse(savedProducts))
+      } catch (e) {
+        console.error("Failed to parse saved products", e)
+      }
+    }
+
     const savedOrders = localStorage.getItem("sathiya_tex_orders")
     if (savedOrders) {
       try {
@@ -244,67 +174,82 @@ export function DataProvider({ children }: { children: ReactNode }) {
         console.error("Failed to parse saved orders", e)
       }
     }
+
+    const savedEmployees = localStorage.getItem("sathiya_tex_employees")
+    if (savedEmployees) {
+      try {
+        setEmployees(JSON.parse(savedEmployees))
+      } catch (e) {
+        console.error("Failed to parse saved employees", e)
+      }
+    }
+    
+    const savedMessages = localStorage.getItem("sathiya_tex_messages")
+    if (savedMessages) {
+      try {
+        setMessages(JSON.parse(savedMessages))
+      } catch (e) {
+        console.error("Failed to parse saved messages", e)
+      }
+    }
+    
+    setIsLoaded(true)
   }, [])
 
   // Save orders to localStorage whenever they change
   useEffect(() => {
-    if (orders.length > 0) {
+    if (isLoaded) {
       localStorage.setItem("sathiya_tex_orders", JSON.stringify(orders))
     }
-  }, [orders])
+  }, [orders, isLoaded])
 
-  // Demo accounts should see the demo dataset plus any newly placed orders.
-  // New users should start with clean state (no demo orders / employees).
+  // Save products to localStorage whenever they change
   useEffect(() => {
-    const demoEmails = [
-      "owner@sathiyatex.com",
-      "customer@example.com",
-      "employee@sathiyatex.com",
-      "hari@gmail.com",
-    ]
-
-    if (!user) {
-      setEmployees([])
-      // Don't clear orders here, they are global for the session
-      return
+    if (isLoaded) {
+      localStorage.setItem("sathiya_tex_products", JSON.stringify(products))
     }
+  }, [products, isLoaded])
 
-    if (demoEmails.includes(user.email)) {
-      setEmployees(initialEmployees)
-      
-      // Merge initial demo orders with current orders (if not already present)
-      setOrders((prev) => {
-        const existingIds = new Set(prev.map(o => o.id))
-        const newDemoOrders = initialOrders.filter(o => !existingIds.has(o.id))
-        return [...prev, ...newDemoOrders]
-      })
+  // Save employees to localStorage whenever they change
+  useEffect(() => {
+    if (isLoaded && employees.length > 0) {
+      localStorage.setItem("sathiya_tex_employees", JSON.stringify(employees))
+    }
+  }, [employees, isLoaded])
+
+  // Save messages to localStorage
+  useEffect(() => {
+    if (isLoaded) {
+      localStorage.setItem("sathiya_tex_messages", JSON.stringify(messages))
+    }
+  }, [messages, isLoaded])
+
+  // New users should start with clean state but see their persisted data.
+  useEffect(() => {
+    if (!user || !isLoaded) {
       return
     }
 
     if (user.role === "employee") {
       setEmployees((prev) => {
         if (prev.some((e) => e.email === user.email)) return prev
-        return [
-          ...prev,
-          {
-            id: user.id,
-            name: user.name,
-            email: user.email,
-            phone: user.phone ?? "",
-            department: user.department ?? "",
-            skills: user.skills ?? [],
-            status: "active",
-            workload: 0,
-            joinDate: new Date().toISOString().split("T")[0],
-            salary: 0,
-          },
-        ]
+        const newEmployee: Employee = {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          phone: user.phone ?? "",
+          department: user.department ?? "",
+          skills: user.skills ?? [],
+          status: "active",
+          workload: 0,
+          joinDate: new Date().toISOString().split("T")[0],
+          salary: 0,
+        }
+        return [...prev, newEmployee]
       })
       return
     }
-
-    setEmployees([])
-  }, [user])
+  }, [user, isLoaded])
 
   const updateProduct = (id: string, data: Partial<Product>) => {
     setProducts((prev) =>
@@ -315,7 +260,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const addProduct = (product: Omit<Product, "id">) => {
     const newProduct = {
       ...product,
-      id: String(products.length + 1),
+      id: `PROD-${Date.now()}`,
     }
     setProducts((prev) => [...prev, newProduct])
   }
@@ -366,6 +311,22 @@ export function DataProvider({ children }: { children: ReactNode }) {
     )
   }
 
+  const addMessage = (message: Omit<Message, "id" | "createdAt" | "isRead">) => {
+    const newMessage: Message = {
+      ...message,
+      id: `MSG-${Date.now()}`,
+      createdAt: new Date().toISOString(),
+      isRead: false,
+    }
+    setMessages((prev) => [...prev, newMessage])
+  }
+
+  const markMessageRead = (messageId: string) => {
+    setMessages((prev) =>
+      prev.map((m) => (m.id === messageId ? { ...m, isRead: true } : m))
+    )
+  }
+
   return (
     <DataContext.Provider
       value={{
@@ -380,6 +341,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
         deleteEmployee,
         addOrder,
         updateOrder,
+        messages,
+        addMessage,
+        markMessageRead,
       }}
     >
       {children}

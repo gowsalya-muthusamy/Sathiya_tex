@@ -12,7 +12,7 @@ import { Package, Clock, Truck, CheckCircle2, ShoppingBag } from "lucide-react"
 export default function CustomerOrdersPage() {
   const router = useRouter()
   const { user, isLoading } = useAuth()
-  const { orders } = useData()
+  const { orders, employees } = useData()
 
   useEffect(() => {
     if (!isLoading && (!user || user.role !== "customer")) {
@@ -180,11 +180,36 @@ export default function CustomerOrdersPage() {
                     </div>
                   </div>
 
+                  {/* Order Details (Address, Phone, Payment) */}
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-1 text-sm text-muted-foreground">
+                      <p className="font-medium text-foreground flex items-center gap-2">
+                        <Truck className="h-4 w-4" /> Shipping Address
+                      </p>
+                      <p>{order.address || "No address provided"}</p>
+                    </div>
+                    <div className="space-y-1 text-sm text-muted-foreground">
+                      <p className="font-medium text-foreground flex items-center gap-2">
+                        <ShoppingBag className="h-4 w-4" /> Order Info
+                      </p>
+                      <p>Contact: {order.phone || "No phone provided"}</p>
+                      <p>Payment: <span className="uppercase font-bold">{order.paymentMode || "COD"}</span></p>
+                    </div>
+                  </div>
+
                   {/* Assigned Employee */}
                   {order.assignedEmployee && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <span>Handled by:</span>
-                      <Badge variant="outline">{order.assignedEmployee}</Badge>
+                    <div className="flex flex-col gap-2 border-t border-border pt-4 text-sm text-muted-foreground sm:flex-row sm:items-center">
+                      <div className="flex items-center gap-2">
+                        <span>Handled by:</span>
+                        <Badge variant="outline">{order.assignedEmployee}</Badge>
+                      </div>
+                      {employees.find(e => e.name === order.assignedEmployee) && (
+                        <div className="flex items-center gap-2 text-primary font-medium">
+                          <span className="h-1 w-1 rounded-full bg-muted-foreground hidden sm:block" />
+                          <span>Contact: {employees.find(e => e.name === order.assignedEmployee)?.phone}</span>
+                        </div>
+                      )}
                     </div>
                   )}
                 </CardContent>

@@ -31,7 +31,7 @@ import { Plus, Search, Edit2, Trash2, Users, Mail, Phone, Calendar, Briefcase } 
 export default function EmployeesPage() {
   const router = useRouter()
   const { user, isLoading } = useAuth()
-  const { employees, updateEmployee, addEmployee, deleteEmployee } = useData()
+  const { employees, updateEmployee, addEmployee, deleteEmployee, orders } = useData()
   const [searchQuery, setSearchQuery] = useState("")
   const [filterDepartment, setFilterDepartment] = useState("all")
   const [filterStatus, setFilterStatus] = useState("all")
@@ -61,7 +61,7 @@ export default function EmployeesPage() {
     )
   }
 
-  const departments = [...new Set(employees.map((e) => e.department))]
+  const departments = [...new Set(employees.map((e) => e.department).filter(Boolean))]
 
   const filteredEmployees = employees.filter((e) => {
     const matchesSearch =
@@ -395,18 +395,47 @@ export default function EmployeesPage() {
                 <div>
                   <div className="mb-1 flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">Workload</span>
-                    <span className="font-medium">{employee.workload}%</span>
+                    <span className="font-medium">
+                      {Math.min(
+                        100,
+                        orders.filter(
+                          (o) =>
+                            o.assignedEmployee?.toLowerCase() ===
+                              employee.name.toLowerCase() && o.status !== "delivered"
+                        ).length * 20
+                      )}
+                      %
+                    </span>
                   </div>
                   <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                     <div
                       className={`h-full rounded-full transition-all ${
-                        employee.workload > 80
+                        orders.filter(
+                          (o) =>
+                            o.assignedEmployee?.toLowerCase() ===
+                              employee.name.toLowerCase() && o.status !== "delivered"
+                        ).length * 20 >
+                        80
                           ? "bg-destructive"
-                          : employee.workload > 60
+                          : orders.filter(
+                              (o) =>
+                                o.assignedEmployee?.toLowerCase() ===
+                                  employee.name.toLowerCase() && o.status !== "delivered"
+                            ).length * 20 >
+                            60
                           ? "bg-chart-5"
                           : "bg-accent"
                       }`}
-                      style={{ width: `${employee.workload}%` }}
+                      style={{
+                        width: `${Math.min(
+                          100,
+                          orders.filter(
+                            (o) =>
+                              o.assignedEmployee?.toLowerCase() ===
+                                employee.name.toLowerCase() && o.status !== "delivered"
+                          ).length * 20
+                        )}%`,
+                      }}
                     />
                   </div>
                 </div>

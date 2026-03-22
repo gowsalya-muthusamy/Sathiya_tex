@@ -139,7 +139,7 @@ export default function OwnerOrdersPage() {
     }
   }
 
-  const activeEmployees = employees.filter((e) => e.status === "active")
+  const activeEmployees = employees.filter((e) => e.status === "active" && e.name.trim() !== "")
 
   return (
     <DashboardLayout>
@@ -361,6 +361,22 @@ export default function OwnerOrdersPage() {
                   </p>
                 </div>
               </div>
+
+              <div className="grid grid-cols-2 gap-4 rounded-lg bg-muted/30 p-4 border border-border">
+                <div>
+                  <Label className="text-muted-foreground">Delivery Address</Label>
+                  <p className="font-medium">{selectedOrder.address || "No address provided"}</p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground">Contact Phone</Label>
+                  <p className="font-medium">{selectedOrder.phone || "No phone provided"}</p>
+                </div>
+                <div className="mt-2">
+                  <Label className="text-muted-foreground">Payment Mode</Label>
+                  <p className="font-medium uppercase">{selectedOrder.paymentMode || "COD"}</p>
+                </div>
+              </div>
+
               <div>
                 <Label className="text-muted-foreground">Products</Label>
                 <div className="mt-2 rounded-lg border border-border">

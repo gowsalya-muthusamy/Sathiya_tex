@@ -25,6 +25,7 @@ import {
   Menu,
   X,
   BarChart3,
+  MessageSquare,
 } from "lucide-react"
 import { useState } from "react"
 
@@ -41,16 +42,19 @@ const navItemsByRole: Record<UserRole, NavItem[]> = {
     { label: "Employees", href: "/dashboard/owner/employees", icon: Users },
     { label: "Orders", href: "/dashboard/owner/orders", icon: ShoppingCart },
     { label: "Analytics", href: "/dashboard/owner/analytics", icon: BarChart3 },
+    { label: "Messages", href: "/dashboard/owner/messages", icon: MessageSquare },
   ],
   customer: [
     { label: "Dashboard", href: "/dashboard/customer", icon: LayoutDashboard },
     { label: "Products", href: "/dashboard/customer/products", icon: Package },
     { label: "My Orders", href: "/dashboard/customer/orders", icon: ShoppingCart },
+    { label: "Messages", href: "/dashboard/customer/messages", icon: MessageSquare },
   ],
   employee: [
     { label: "Dashboard", href: "/dashboard/employee", icon: LayoutDashboard },
     { label: "My Tasks", href: "/dashboard/employee/tasks", icon: ClipboardList },
     { label: "Inventory", href: "/dashboard/employee/inventory", icon: Package },
+    { label: "Messages", href: "/dashboard/employee/messages", icon: MessageSquare },
   ],
 }
 
@@ -179,10 +183,12 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>
-                <Settings className="mr-2 h-4 w-4" />
-                Settings
-              </DropdownMenuItem>
+              <Link href={`/dashboard/${user.role}/settings`}>
+                <DropdownMenuItem className="cursor-pointer">
+                  <Settings className="mr-2 h-4 w-4" />
+                  Settings
+                </DropdownMenuItem>
+              </Link>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleLogout} className="text-destructive">
                 <LogOut className="mr-2 h-4 w-4" />
